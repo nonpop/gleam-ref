@@ -12,7 +12,7 @@ type Msg(a) {
   ShutDown
 }
 
-@external(javascript, "./ref_extern.mjs", "dummy")
+@target(erlang)
 fn handle_ref(msg: Msg(a), contents: a) -> actor.Next(Msg(a), a) {
   case msg {
     Get(client) -> {
@@ -29,6 +29,7 @@ fn handle_ref(msg: Msg(a), contents: a) -> actor.Next(Msg(a), a) {
 }
 
 /// The reference cell type for holding mutable data
+@external(go, "", "RefCell_t")
 pub opaque type RefCell(a) {
   Cell(state: process.Subject(Msg(a)))
 }
@@ -39,11 +40,19 @@ pub opaque type RefCell(a) {
 /// let immutable_value: List(Int) = [1, 2, 3, 4]
 /// let mutable_copy: RefCell(List(Int)) = ref.cell(immutable_value)
 /// ```
-@external(javascript, "./ref_extern.mjs", "cell")
+@target(erlang)
 pub fn cell(contents: a) -> RefCell(a) {
   let assert Ok(state) = actor.start(contents, handle_ref)
   Cell(state)
 }
+
+@target(javascript)
+@external(javascript, "./ref_extern.mjs", "cell")
+pub fn cell(contents: a) -> RefCell(a)
+
+@target(go)
+@external(go, "", "Cell")
+pub fn cell(contents: a) -> RefCell(a)
 
 /// Used for extracting the held data in a RefCell.
 /// Once the value has been extracted with this function, any mutations on the Cell will not affect the data already extracted.
@@ -58,6 +67,7 @@ pub fn cell(contents: a) -> RefCell(a) {
 /// // > 25
 /// ```
 @external(javascript, "./ref_extern.mjs", "get")
+@external(go, "", "Get")
 pub fn get(cell: RefCell(a)) -> a {
   process.call(cell.state, Get(_), 1000)
 }
@@ -75,10 +85,14 @@ pub fn get(cell: RefCell(a)) -> a {
 /// ref.try_get(state) |> io.debug
 /// // > Error(_)
 /// ```
-@external(javascript, "./ref_extern.mjs", "try_get")
+@target(erlang)
 pub fn try_get(cell: RefCell(a)) -> Result(a, CallError(a)) {
   process.try_call(cell.state, Get(_), 1000)
 }
+
+@target(javascript)
+@external(javascript, "./ref_extern.mjs", "try_get")
+pub fn try_get(cell: RefCell(a)) -> Result(a, CallError(a))
 
 /// Pass a function that takes and returns the inner type of the RefCell, and set the contents of the cell to its return value
 /// # Examples
@@ -91,6 +105,7 @@ pub fn try_get(cell: RefCell(a)) -> Result(a, CallError(a)) {
 /// // state -> RefCell([2, 3, 4])
 /// ```
 @external(javascript, "./ref_extern.mjs", "set")
+@external(go, "", "Set")
 pub fn set(cell: RefCell(a), operation: fn(a) -> a) -> a {
   actor.call(cell.state, Set(operation, _), 1000)
 }
@@ -104,6 +119,7 @@ pub fn set(cell: RefCell(a), operation: fn(a) -> a) -> a {
 /// // > Error(_)
 /// ```
 @external(javascript, "./ref_extern.mjs", "kill_ref")
+@external(go, "", "Kill")
 pub fn kill(cell: RefCell(a)) -> Nil {
   actor.send(cell.state, ShutDown)
 }
